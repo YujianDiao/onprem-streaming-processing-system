@@ -1,0 +1,82 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'data-platform'
+    environment: 'poc'
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # Kafka JMX metrics
+  - job_name: 'kafka-broker-1'
+    static_configs:
+      - targets: ['kafka-1:9101']
+        labels:
+          service: 'kafka'
+          broker_id: '1'
+
+  - job_name: 'kafka-broker-2'
+    static_configs:
+      - targets: ['kafka-2:9102']
+        labels:
+          service: 'kafka'
+          broker_id: '2'
+
+  - job_name: 'kafka-broker-3'
+    static_configs:
+      - targets: ['kafka-3:9103']
+        labels:
+          service: 'kafka'
+          broker_id: '3'
+
+  # PostgreSQL exporter (if installed)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+        labels:
+          service: 'postgresql'
+
+  # MinIO metrics
+  - job_name: 'minio'
+    metrics_path: /minio/v2/metrics/cluster
+    scheme: http
+    static_configs:
+      - targets: ['minio:9000']
+        labels:
+          service: 'minio'
+
+  # Spark Master
+  - job_name: 'spark-master'
+    static_configs:
+      - targets: ['spark-master:8080']
+        labels:
+          service: 'spark'
+          component: 'master'
+
+  # Spark Workers
+  - job_name: 'spark-workers'
+    static_configs:
+      - targets: ['spark-worker-1:8081', 'spark-worker-2:8082']
+        labels:
+          service: 'spark'
+          component: 'worker'
+
+  # Grafana
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+        labels:
+          service: 'grafana'

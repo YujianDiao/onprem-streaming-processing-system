@@ -1,0 +1,60 @@
+version: '3.8'
+
+# Lightweight configuration for resource-constrained environments
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.lightweight.yml up
+
+services:
+  # Use single Kafka broker instead of 3
+  kafka-1:
+    environment:
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_HEAP_OPTS: "-Xmx512M -Xms512M"
+
+  # Disable additional Kafka brokers
+  kafka-2:
+    deploy:
+      replicas: 0
+    profiles:
+      - full
+
+  kafka-3:
+    deploy:
+      replicas: 0
+    profiles:
+      - full
+
+  # Reduce Spark worker resources
+  spark-worker-1:
+    environment:
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=1
+
+  # Disable second Spark worker
+  spark-worker-2:
+    deploy:
+      replicas: 0
+    profiles:
+      - full
+
+  # Reduce PostgreSQL resources
+  postgres:
+    command: postgres -c shared_buffers=256MB -c max_connections=50
+
+  # DataHub services disabled by default (already in profile)
+  datahub-mysql:
+    deploy:
+      replicas: 0
+
+  datahub-elasticsearch:
+    deploy:
+      replicas: 0
+
+  datahub-gms:
+    deploy:
+      replicas: 0
+
+  datahub-frontend:
+    deploy:
+      replicas: 0
