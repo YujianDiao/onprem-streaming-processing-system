@@ -42,6 +42,17 @@ services:
   postgres:
     command: postgres -c shared_buffers=256MB -c max_connections=50
 
+  # Reduce Trino resources
+  trino:
+    volumes:
+      - ./trino/etc-lightweight:/etc/trino
+      - ./trino/catalog:/etc/trino/catalog
+
+  # Reduce Hive Metastore resources
+  hive-metastore:
+    environment:
+      HADOOP_HEAPSIZE: 512
+
   # DataHub services disabled by default (already in profile)
   datahub-mysql:
     deploy:
