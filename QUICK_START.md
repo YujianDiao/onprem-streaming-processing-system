@@ -10,8 +10,8 @@ docker --version
 # Should be 20.10+
 
 # Check Docker Compose
-docker-compose --version
-# Should be 2.0+
+docker compose version
+# Should be 2.0+ (note: 'docker compose' not 'docker-compose')
 
 # Check available resources
 docker info | grep -E "CPUs|Total Memory"
@@ -48,7 +48,7 @@ cd onprem-streaming-processing-system
 make setup
 
 # 3. Start with lightweight config
-docker-compose -f docker-compose.yml -f docker-compose.lightweight.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.lightweight.yml up -d
 
 # Wait for services to initialize
 ```
@@ -71,8 +71,11 @@ make urls
 | Service | URL | Credentials |
 |---------|-----|-------------|
 | Kafka UI | http://localhost:8080 | None |
+| Schema Registry | http://localhost:8081 | None |
 | Trino | http://localhost:8086 | None |
 | Spark Master | http://localhost:8888 | None |
+| Spark Worker 1 | http://localhost:8091 | None |
+| Spark Worker 2 | http://localhost:8092 | None |
 | Grafana | http://localhost:3000 | admin/admin |
 | MinIO Console | http://localhost:9001 | minioadmin/minioadmin |
 | Prometheus | http://localhost:9090 | None |
@@ -412,10 +415,10 @@ make restart
 
 ```bash
 # Use lightweight setup
-docker-compose -f docker-compose.yml -f docker-compose.lightweight.yml restart
+docker compose -f docker-compose.yml -f docker-compose.lightweight.yml restart
 
 # Or stop non-essential services
-docker-compose stop datahub-mysql datahub-elasticsearch datahub-gms datahub-frontend
+docker compose stop datahub-mysql datahub-elasticsearch datahub-gms datahub-frontend
 
 # Check resource usage
 docker stats
@@ -431,7 +434,7 @@ make logs-kafka
 make test-kafka
 
 # Restart Kafka cluster
-docker-compose restart kafka-1 kafka-2 kafka-3
+docker compose restart kafka-1 kafka-2 kafka-3
 ```
 
 ### Data generator not producing
@@ -452,7 +455,7 @@ make datagen-start
 
 ```bash
 # 1. Check if data generator is running
-docker-compose ps data-generator
+docker compose ps data-generator
 
 # 2. Verify Kafka has messages
 docker exec kafka-1 kafka-console-consumer \
@@ -464,7 +467,7 @@ docker exec kafka-1 kafka-console-consumer \
 make logs-spark | grep -i streaming
 
 # 4. Verify Hive Metastore connection
-docker-compose logs hive-metastore
+docker compose logs hive-metastore
 
 # 5. Check if tables exist in Trino
 docker exec trino trino --execute "SHOW TABLES IN iceberg.default"
@@ -477,7 +480,7 @@ docker exec trino trino --execute "SHOW TABLES IN iceberg.default"
 make logs-trino
 
 # Verify Hive Metastore
-docker-compose logs hive-metastore
+docker compose logs hive-metastore
 
 # Test Trino connection
 make test-trino

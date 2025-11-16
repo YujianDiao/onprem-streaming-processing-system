@@ -29,60 +29,60 @@ start: ## Start all services
 
 start-core: ## Start only core services (Kafka, PostgreSQL, MinIO)
 	@echo "$(YELLOW)Starting core services...$(NC)"
-	@docker-compose up -d kafka-1 kafka-2 kafka-3 postgres minio hive-metastore
+	@docker compose up -d kafka-1 kafka-2 kafka-3 postgres minio hive-metastore
 	@echo "$(GREEN)✓ Core services started$(NC)"
 
 start-processing: ## Start processing layer (Spark)
 	@echo "$(YELLOW)Starting processing layer...$(NC)"
-	@docker-compose up -d spark-master spark-worker-1 spark-worker-2
+	@docker compose up -d spark-master spark-worker-1 spark-worker-2
 	@echo "$(GREEN)✓ Processing layer started$(NC)"
 
 start-monitoring: ## Start monitoring stack (Prometheus, Grafana)
 	@echo "$(YELLOW)Starting monitoring stack...$(NC)"
-	@docker-compose up -d prometheus grafana
+	@docker compose up -d prometheus grafana
 	@echo "$(GREEN)✓ Monitoring stack started$(NC)"
 
 start-analytics: ## Start analytics tools (Trino)
 	@echo "$(YELLOW)Starting analytics tools...$(NC)"
-	@docker-compose up -d trino
+	@docker compose up -d trino
 	@echo "$(GREEN)✓ Analytics tools started$(NC)"
 
 start-datahub: ## Start DataHub (optional)
 	@echo "$(YELLOW)Starting DataHub...$(NC)"
-	@docker-compose --profile datahub up -d
+	@docker compose --profile datahub up -d
 	@echo "$(GREEN)✓ DataHub started$(NC)"
 
 stop: ## Stop all services
 	@echo "$(YELLOW)Stopping all services...$(NC)"
-	@docker-compose down
+	@docker compose down
 	@echo "$(GREEN)✓ All services stopped$(NC)"
 
 restart: ## Restart all services
 	@echo "$(YELLOW)Restarting all services...$(NC)"
-	@docker-compose restart
+	@docker compose restart
 	@echo "$(GREEN)✓ All services restarted$(NC)"
 
 status: ## Show status of all services
 	@echo "$(YELLOW)Service Status:$(NC)"
-	@docker-compose ps
+	@docker compose ps
 
 logs: ## Show logs for all services
-	@docker-compose logs -f
+	@docker compose logs -f
 
 logs-kafka: ## Show Kafka logs
-	@docker-compose logs -f kafka-1 kafka-2 kafka-3
+	@docker compose logs -f kafka-1 kafka-2 kafka-3
 
 logs-spark: ## Show Spark logs
-	@docker-compose logs -f spark-master spark-worker-1 spark-worker-2
+	@docker compose logs -f spark-master spark-worker-1 spark-worker-2
 
 logs-trino: ## Show Trino logs
-	@docker-compose logs -f trino
+	@docker compose logs -f trino
 
 logs-postgres: ## Show PostgreSQL logs
-	@docker-compose logs -f postgres
+	@docker compose logs -f postgres
 
 logs-datagen: ## Show Data Generator logs
-	@docker-compose logs -f data-generator
+	@docker compose logs -f data-generator
 
 topics: ## Create Kafka topics
 	@echo "$(YELLOW)Creating Kafka topics...$(NC)"
@@ -90,12 +90,12 @@ topics: ## Create Kafka topics
 
 datagen-start: ## Start data generator
 	@echo "$(YELLOW)Starting data generator...$(NC)"
-	@docker-compose up -d data-generator
+	@docker compose up -d data-generator
 	@echo "$(GREEN)✓ Data generator started$(NC)"
 
 datagen-stop: ## Stop data generator
 	@echo "$(YELLOW)Stopping data generator...$(NC)"
-	@docker-compose stop data-generator
+	@docker compose stop data-generator
 	@echo "$(GREEN)✓ Data generator stopped$(NC)"
 
 kafka-ui: ## Open Kafka UI in browser
@@ -184,7 +184,7 @@ clean: ## Stop services and remove volumes (WARNING: deletes all data!)
 	@read -p "Are you sure? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		docker-compose down -v; \
+		docker compose down -v; \
 		echo "$(GREEN)✓ Cleanup complete$(NC)"; \
 	else \
 		echo "$(YELLOW)Cleanup cancelled$(NC)"; \
@@ -195,7 +195,7 @@ clean-all: ## Complete cleanup including images
 	@read -p "Are you sure? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		docker-compose down -v --rmi all; \
+		docker compose down -v --rmi all; \
 		docker system prune -af; \
 		echo "$(GREEN)✓ Complete cleanup done$(NC)"; \
 	else \
@@ -204,17 +204,17 @@ clean-all: ## Complete cleanup including images
 
 rebuild: ## Rebuild custom images (Data Generator)
 	@echo "$(YELLOW)Rebuilding custom images...$(NC)"
-	@docker-compose build --no-cache data-generator
+	@docker compose build --no-cache data-generator
 	@echo "$(GREEN)✓ Rebuild complete$(NC)"
 
 update: ## Pull latest images
 	@echo "$(YELLOW)Pulling latest images...$(NC)"
-	@docker-compose pull
+	@docker compose pull
 	@echo "$(GREEN)✓ Images updated$(NC)"
 
 health: ## Check health of all services
 	@echo "$(YELLOW)Checking service health...$(NC)"
-	@docker-compose ps | grep -E "(healthy|Up)" || echo "$(RED)Some services are not healthy$(NC)"
+	@docker compose ps | grep -E "(healthy|Up)" || echo "$(RED)Some services are not healthy$(NC)"
 
 stats: ## Show resource usage statistics
 	@docker stats --no-stream
@@ -231,6 +231,8 @@ urls: ## Show all service URLs
 	@echo "  Schema Registry:   http://localhost:8081"
 	@echo "  Trino:             http://localhost:8086"
 	@echo "  Spark Master:      http://localhost:8888"
+	@echo "  Spark Worker 1:    http://localhost:8091"
+	@echo "  Spark Worker 2:    http://localhost:8092"
 	@echo "  MinIO Console:     http://localhost:9001"
 	@echo "  Grafana:           http://localhost:3000"
 	@echo "  Prometheus:        http://localhost:9090"

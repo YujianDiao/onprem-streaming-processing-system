@@ -69,7 +69,7 @@ For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
 |-----------|-----------|---------|---------|
 | Event Streaming | Apache Kafka (KRaft) | 7.5.0 | Message broker in consensus mode |
 | Schema Management | Confluent Schema Registry | 7.5.0 | Avro/JSON schema validation |
-| Stream Processing | Apache Spark | 3.5.0 | Real-time data processing |
+| Stream Processing | Apache Spark | 3.5.0 | Real-time data processing (apache/spark) |
 | SQL Analytics | Trino | Latest | Distributed SQL query engine |
 | Object Storage | MinIO | Latest | S3-compatible data lake |
 | Table Format | Apache Iceberg | 1.4.2 | ACID transactions, time travel |
@@ -137,8 +137,11 @@ The startup script will:
 
 **Access the platform:**
 - Kafka UI: http://localhost:8080
+- Schema Registry: http://localhost:8081
 - Trino: http://localhost:8086
 - Spark Master: http://localhost:8888
+- Spark Worker 1: http://localhost:8091
+- Spark Worker 2: http://localhost:8092
 - Grafana: http://localhost:3000 (admin/admin)
 - MinIO Console: http://localhost:9001 (minioadmin/minioadmin)
 - Prometheus: http://localhost:9090
@@ -711,8 +714,8 @@ make clean-all         # Complete cleanup
 | Schema Registry | http://localhost:8081 | - |
 | Trino | http://localhost:8086 | - |
 | Spark Master | http://localhost:8888 | - |
-| Spark Worker 1 | http://localhost:8081 | - |
-| Spark Worker 2 | http://localhost:8082 | - |
+| Spark Worker 1 | http://localhost:8091 | - |
+| Spark Worker 2 | http://localhost:8092 | - |
 | MinIO Console | http://localhost:9001 | minioadmin/minioadmin |
 | Grafana | http://localhost:3000 | admin/admin |
 | Prometheus | http://localhost:9090 | - |

@@ -34,7 +34,7 @@ check_service() {
     echo -e "${YELLOW}Waiting for $service to be healthy...${NC}"
 
     while [ $attempt -le $max_attempts ]; do
-        if docker-compose ps | grep $service | grep -q "healthy\|Up"; then
+        if docker compose ps | grep $service | grep -q "healthy\|Up"; then
             echo -e "${GREEN}✓ $service is ready${NC}"
             return 0
         fi
@@ -49,7 +49,7 @@ check_service() {
 
 # Start infrastructure services
 echo -e "\n${GREEN}Step 1: Starting infrastructure services...${NC}"
-docker-compose up -d kafka-1 kafka-2 kafka-3 postgres minio
+docker compose up -d kafka-1 kafka-2 kafka-3 postgres minio
 
 check_service "kafka-1"
 check_service "postgres"
@@ -57,11 +57,11 @@ check_service "minio"
 
 # Initialize MinIO buckets
 echo -e "\n${GREEN}Step 2: Initializing MinIO buckets...${NC}"
-docker-compose up minio-init
+docker compose up minio-init
 
 # Start Kafka ecosystem
 echo -e "\n${GREEN}Step 3: Starting Kafka ecosystem...${NC}"
-docker-compose up -d schema-registry kafka-ui
+docker compose up -d schema-registry kafka-ui
 
 check_service "schema-registry"
 
@@ -71,34 +71,34 @@ bash scripts/setup-kafka-topics.sh
 
 # Start Hive Metastore
 echo -e "\n${GREEN}Step 5: Starting Hive Metastore...${NC}"
-docker-compose up -d hive-metastore
+docker compose up -d hive-metastore
 
 check_service "hive-metastore"
 
 # Start processing layer
 echo -e "\n${GREEN}Step 6: Starting Spark cluster...${NC}"
-docker-compose up -d spark-master spark-worker-1 spark-worker-2
+docker compose up -d spark-master spark-worker-1 spark-worker-2
 
 # Start analytics
 echo -e "\n${GREEN}Step 7: Starting Trino...${NC}"
-docker-compose up -d trino
+docker compose up -d trino
 
 check_service "trino"
 
 # Start monitoring
 echo -e "\n${GREEN}Step 8: Starting monitoring stack...${NC}"
-docker-compose up -d prometheus grafana
+docker compose up -d prometheus grafana
 
 # Start data generator
 echo -e "\n${GREEN}Step 9: Starting data generator...${NC}"
-docker-compose up -d data-generator
+docker compose up -d data-generator
 
 # Optional: Start DataHub
 read -p "Do you want to start DataHub? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo -e "${GREEN}Starting DataHub...${NC}"
-    docker-compose --profile datahub up -d
+    docker compose --profile datahub up -d
 fi
 
 # Display service URLs
@@ -118,7 +118,7 @@ echo -e "  Prometheus:       http://localhost:9090"
 echo -e "  PostgreSQL:       localhost:5432 (hive/hive123)"
 echo -e "  Hive Metastore:   thrift://localhost:9083"
 
-if docker-compose ps | grep -q datahub; then
+if docker compose ps | grep -q datahub; then
     echo -e "  DataHub:          http://localhost:9002"
 fi
 
@@ -129,5 +129,5 @@ echo -e "3. View Spark UI to monitor streaming job execution"
 echo -e "4. Monitor system health in Grafana dashboards"
 echo -e "5. Explore Iceberg tables in MinIO via Trino"
 
-echo -e "\n${GREEN}For logs, use: docker-compose logs -f [service-name]${NC}"
-echo -e "${GREEN}To stop all services: docker-compose down${NC}"
+echo -e "\n${GREEN}For logs, use: docker compose logs -f [service-name]${NC}"
+echo -e "${GREEN}To stop all services: docker compose down${NC}"
