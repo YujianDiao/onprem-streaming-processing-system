@@ -13,10 +13,12 @@ guides/data-ingestion-processing/
 ├── README.md                          # This file - main index
 ├── docs/                              # Detailed documentation
 │   ├── BEGINNER_WALKTHROUGH.md       # Step-by-step guide for beginners
-│   └── DATA_STREAMING_GUIDE.md       # Advanced streaming concepts
+│   ├── DATA_STREAMING_GUIDE.md       # Advanced streaming concepts
+│   └── BATCH_PROCESSING_GUIDE.md     # Batch transformations (Bronze→Silver→Gold)
 ├── scripts/                           # Automation scripts
-│   ├── start-pipeline.sh             # Start complete data pipeline
-│   └── monitor-pipeline.sh           # Monitor pipeline status
+│   ├── start-pipeline.sh             # Start complete streaming pipeline
+│   ├── monitor-pipeline.sh           # Monitor pipeline status
+│   └── run-batch-pipeline.sh         # Run batch aggregations
 └── examples/                          # Code examples
     ├── custom-producer.py            # Send custom data to Kafka
     └── trino-queries.sql             # SQL query examples
