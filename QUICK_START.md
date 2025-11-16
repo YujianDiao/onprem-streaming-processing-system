@@ -524,10 +524,17 @@ This is a **data lakehouse** platform, not a traditional data lake or warehouse:
 
 ## Getting Help
 
+### Documentation
+- **[Beginner Walkthrough](guides/data-ingestion-processing/docs/BEGINNER_WALKTHROUGH.md)** - Detailed step-by-step guide
+- **[Data Streaming Guide](guides/data-ingestion-processing/docs/DATA_STREAMING_GUIDE.md)** - Advanced topics
+- **[Guides Index](guides/data-ingestion-processing/README.md)** - All guides, scripts, and examples
 - Full documentation: [README.md](README.md)
 - Architecture details: [ARCHITECTURE.md](ARCHITECTURE.md)
+
+### Commands & Logs
 - Makefile commands: `make help`
 - Logs: `make logs-[service-name]`
+- Automated scripts: `guides/data-ingestion-processing/scripts/`
 
 ## Useful Resources
 

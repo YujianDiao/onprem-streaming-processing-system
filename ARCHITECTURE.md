@@ -900,6 +900,18 @@ docker exec trino trino --execute "SHOW TABLES IN iceberg.default"
 - Hive Metastore: https://hive.apache.org/
 - MinIO: https://min.io/
 
+## Related Documentation
+
+### Guides & Tutorials
+- **[Beginner Walkthrough](guides/data-ingestion-processing/docs/BEGINNER_WALKTHROUGH.md)** - Step-by-step guide for first-time users
+- **[Data Streaming Guide](guides/data-ingestion-processing/docs/DATA_STREAMING_GUIDE.md)** - Complete streaming and processing documentation
+- **[Guides Index](guides/data-ingestion-processing/README.md)** - Central hub for all guides and examples
+
+### Quick References
+- [README.md](README.md) - Platform overview and quick start
+- [QUICK_START.md](QUICK_START.md) - Fast setup guide
+- [Automation Scripts](guides/data-ingestion-processing/scripts/) - Pipeline automation tools
+
 ---
 
 **This architecture provides a modern, simplified data lakehouse that can run on a single server while maintaining production-ready capabilities for analytics and data engineering workloads.**

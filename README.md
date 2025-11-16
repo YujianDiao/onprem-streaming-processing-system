@@ -63,6 +63,29 @@ Data Generator → Kafka → Spark Streaming → Iceberg (MinIO) ← Trino (SQL 
 
 For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
+## 📚 Guides & Documentation
+
+Comprehensive guides for working with the platform:
+
+### For Beginners
+- **[Complete Walkthrough](guides/data-ingestion-processing/docs/BEGINNER_WALKTHROUGH.md)** - Step-by-step guide from zero to analytics
+  - No prior Kafka/streaming experience needed
+  - Every command explained with expected outputs
+  - Hands-on experiments and troubleshooting
+
+### For All Users
+- **[Data Streaming Guide](guides/data-ingestion-processing/docs/DATA_STREAMING_GUIDE.md)** - Complete data pipeline documentation
+  - Data ingestion and Kafka configuration
+  - Spark stream processing
+  - Creating Iceberg tables
+  - Advanced analytics with Trino
+  - Performance optimization
+
+### Quick Resources
+- **[Guides Index](guides/data-ingestion-processing/README.md)** - Central hub for all guides, scripts, and examples
+- **[Automation Scripts](guides/data-ingestion-processing/scripts/)** - Start and monitor pipeline automatically
+- **[Code Examples](guides/data-ingestion-processing/examples/)** - Custom data producers and SQL queries
+
 ## Technology Stack
 
 | Component | Technology | Version | Purpose |
