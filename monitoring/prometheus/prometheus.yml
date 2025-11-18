@@ -13,6 +13,10 @@ alerting:
 
 # Scrape configurations
 scrape_configs:
+  # ==================================================
+  # CORE MONITORING SERVICES
+  # ==================================================
+
   # Prometheus self-monitoring
   - job_name: 'prometheus'
     static_configs:
@@ -27,89 +31,106 @@ scrape_configs:
         labels:
           service: 'grafana'
 
-  # MinIO metrics - DISABLED (requires AWS4-HMAC-SHA256 authentication)
-  # MinIO requires bearer token or AWS signature for metrics endpoint
-  # To enable: Set MINIO_PROMETHEUS_AUTH_TYPE=public in MinIO environment
-  # See MONITORING_ENHANCEMENTS.md for details
-  #
-  # - job_name: 'minio'
-  #   metrics_path: /minio/v2/metrics/cluster
-  #   scheme: http
-  #   bearer_token: 'your-prometheus-bearer-token'
+  # ==================================================
+  # INFRASTRUCTURE METRICS
+  # ==================================================
+
+  # cAdvisor - Container metrics for ALL containers
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: 'container-metrics'
+
+  # Node Exporter - Host system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'node-exporter'
+
+  # ==================================================
+  # DATA PLATFORM SERVICES
+  # ==================================================
+
+  # MinIO Object Storage
+  - job_name: 'minio'
+    metrics_path: /minio/v2/metrics/cluster
+    scheme: http
+    bearer_token: 'eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJwcm9tZXRoZXVzIiwic3ViIjoibWluaW9hZG1pbiIsImV4cCI6NDkxNjg5MTE0M30.-e6j9gQsDngdGtj-pJQA7VPcVOTo4xjgQX-CZOLb9UgwjvakrN3XZruGwG0f4JY2ND2eLM70OuIZMM8jA_ygTg'
+    static_configs:
+      - targets: ['minio:9000']
+        labels:
+          service: 'minio'
+
+  # PostgreSQL Exporter - Hive Metastore Database
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgresql'
+          database: 'metastore'
+
+  # ==================================================
+  # KAFKA CLUSTER METRICS (via JMX Exporter)
+  # ==================================================
+
+  # Kafka Broker 1
+  - job_name: 'kafka-broker-1'
+    static_configs:
+      - targets: ['kafka-jmx-exporter-1:5556']
+        labels:
+          service: 'kafka'
+          broker_id: '1'
+          broker_host: 'kafka-1'
+
+  # Kafka Broker 2
+  - job_name: 'kafka-broker-2'
+    static_configs:
+      - targets: ['kafka-jmx-exporter-2:5556']
+        labels:
+          service: 'kafka'
+          broker_id: '2'
+          broker_host: 'kafka-2'
+
+  # Kafka Broker 3
+  - job_name: 'kafka-broker-3'
+    static_configs:
+      - targets: ['kafka-jmx-exporter-3:5556']
+        labels:
+          service: 'kafka'
+          broker_id: '3'
+          broker_host: 'kafka-3'
+
+  # ==================================================
+  # SPARK CLUSTER METRICS (Future - Requires Config)
+  # ==================================================
+
+  # Note: Spark metrics require additional configuration in metrics.properties
+  # Uncomment these after configuring Spark metrics sink
+
+  # - job_name: 'spark-master'
+  #   metrics_path: /metrics/prometheus
   #   static_configs:
-  #     - targets: ['minio:9000']
+  #     - targets: ['spark-master:8080']
   #       labels:
-  #         service: 'minio'
+  #         service: 'spark'
+  #         component: 'master'
 
-  # Docker container metrics via cAdvisor (if added)
-  # Uncomment after adding cAdvisor service
-  # - job_name: 'cadvisor'
+  # - job_name: 'spark-worker-1'
+  #   metrics_path: /metrics/prometheus
   #   static_configs:
-  #     - targets: ['cadvisor:8080']
+  #     - targets: ['spark-worker-1:8091']
   #       labels:
-  #         service: 'container-metrics'
+  #         service: 'spark'
+  #         component: 'worker'
+  #         worker_id: '1'
 
-  # Node exporter for system metrics (if added)
-  # Uncomment after adding node-exporter service
-  # - job_name: 'node-exporter'
+  # - job_name: 'spark-worker-2'
+  #   metrics_path: /metrics/prometheus
   #   static_configs:
-  #     - targets: ['node-exporter:9100']
+  #     - targets: ['spark-worker-2:8092']
   #       labels:
-  #         service: 'node-exporter'
-
-# ═══════════════════════════════════════════════════════════════
-# DISABLED TARGETS - Require Additional Configuration/Exporters
-# ═══════════════════════════════════════════════════════════════
-
-# Kafka JMX Metrics - REQUIRES JMX Exporter
-# The Kafka brokers need JMX exporter configuration to expose metrics
-# See MONITORING_ENHANCEMENTS.md for instructions
-#
-# - job_name: 'kafka-broker-1'
-#   static_configs:
-#     - targets: ['kafka-1:9101']
-#       labels:
-#         service: 'kafka'
-#         broker_id: '1'
-#
-# - job_name: 'kafka-broker-2'
-#   static_configs:
-#     - targets: ['kafka-2:9102']
-#       labels:
-#         service: 'kafka'
-#         broker_id: '2'
-#
-# - job_name: 'kafka-broker-3'
-#   static_configs:
-#     - targets: ['kafka-3:9103']
-#       labels:
-#         service: 'kafka'
-#         broker_id: '3'
-
-# PostgreSQL - REQUIRES postgres_exporter
-# PostgreSQL doesn't expose Prometheus metrics natively
-# Add postgres-exporter service and uncomment:
-#
-# - job_name: 'postgres-exporter'
-#   static_configs:
-#     - targets: ['postgres-exporter:9187']
-#       labels:
-#         service: 'postgresql-exporter'
-
-# Spark Cluster - REQUIRES Proper Metrics Configuration
-# Spark services need metrics sink configuration
-# The current endpoints return HTML, not Prometheus metrics
-#
-# - job_name: 'spark-master'
-#   static_configs:
-#     - targets: ['spark-master:8080']
-#       labels:
-#         service: 'spark'
-#         component: 'master'
-#
-# - job_name: 'spark-workers'
-#   static_configs:
-#     - targets: ['spark-worker-1:8091', 'spark-worker-2:8092']
-#       labels:
-#         service: 'spark'
-#         component: 'worker'
+  #         service: 'spark'
+  #         component: 'worker'
+  #         worker_id: '2'

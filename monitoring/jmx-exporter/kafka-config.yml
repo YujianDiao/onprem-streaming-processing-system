@@ -1,0 +1,77 @@
+---
+# JMX Exporter configuration for Kafka Broker 1
+# This configuration connects to Kafka's JMX port and exposes metrics in Prometheus format
+
+hostPort: kafka-1:9101
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+
+rules:
+  # Kafka Server Metrics
+  - pattern: kafka.server<type=(.+), name=(.+), clientId=(.+), topic=(.+), partition=(.*)><>Value
+    name: kafka_server_$1_$2
+    type: GAUGE
+    labels:
+      clientId: "$3"
+      topic: "$4"
+      partition: "$5"
+
+  - pattern: kafka.server<type=(.+), name=(.+), clientId=(.+), brokerHost=(.+), brokerPort=(.+)><>Value
+    name: kafka_server_$1_$2
+    type: GAUGE
+    labels:
+      clientId: "$3"
+      broker: "$4:$5"
+
+  - pattern: kafka.server<type=(.+), name=(.+)><>Value
+    name: kafka_server_$1_$2
+    type: GAUGE
+
+  # Kafka Network Metrics
+  - pattern: kafka.network<type=(.+), name=(.+), request=(.+)><>Value
+    name: kafka_network_$1_$2
+    type: GAUGE
+    labels:
+      request: "$3"
+
+  - pattern: kafka.network<type=(.+), name=(.+)><>Value
+    name: kafka_network_$1_$2
+    type: GAUGE
+
+  # Kafka Log Metrics
+  - pattern: kafka.log<type=(.+), name=(.+), topic=(.+), partition=(.+)><>Value
+    name: kafka_log_$1_$2
+    type: GAUGE
+    labels:
+      topic: "$3"
+      partition: "$4"
+
+  - pattern: kafka.log<type=(.+), name=(.+)><>Value
+    name: kafka_log_$1_$2
+    type: GAUGE
+
+  # Kafka Controller Metrics
+  - pattern: kafka.controller<type=(.+), name=(.+)><>Value
+    name: kafka_controller_$1_$2
+    type: GAUGE
+
+  # Kafka Consumer/Producer Metrics
+  - pattern: kafka.(.+)<type=(.+), client-id=(.+), topic=(.+), partition=(.+)><>(.+)
+    name: kafka_$1_$2_$6
+    type: GAUGE
+    labels:
+      clientId: "$3"
+      topic: "$4"
+      partition: "$5"
+
+  - pattern: kafka.(.+)<type=(.+), client-id=(.+)><>(.+)
+    name: kafka_$1_$2_$4
+    type: GAUGE
+    labels:
+      clientId: "$3"
+
+  # Catch-all for other Kafka metrics
+  - pattern: "kafka.(.+)<type=(.+), name=(.+)><>(.+): (.+)"
+    name: kafka_$1_$2_$3_$4
+    value: $5
+    type: GAUGE

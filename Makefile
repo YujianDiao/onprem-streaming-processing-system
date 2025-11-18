@@ -42,9 +42,9 @@ start-monitoring: ## Start monitoring stack (Prometheus, Grafana)
 	@docker compose up -d prometheus grafana
 	@echo "$(GREEN)✓ Monitoring stack started$(NC)"
 
-start-analytics: ## Start analytics tools (Trino)
+start-analytics: ## Start analytics tools (Trino, Superset)
 	@echo "$(YELLOW)Starting analytics tools...$(NC)"
-	@docker compose up -d trino
+	@docker compose up -d trino superset
 	@echo "$(GREEN)✓ Analytics tools started$(NC)"
 
 start-datahub: ## Start DataHub (optional)
@@ -108,7 +108,11 @@ trino-ui: ## Open Trino UI in browser
 
 spark-ui: ## Open Spark UI in browser
 	@echo "$(YELLOW)Opening Spark UI...$(NC)"
-	@open http://localhost:8888 || xdg-open http://localhost:8888
+	@open http://localhost:8081 || xdg-open http://localhost:8081
+
+superset-ui: ## Open Superset UI in browser
+	@echo "$(YELLOW)Opening Superset UI...$(NC)"
+	@open http://localhost:8088 || xdg-open http://localhost:8088
 
 grafana-ui: ## Open Grafana UI in browser
 	@echo "$(YELLOW)Opening Grafana UI...$(NC)"
@@ -202,9 +206,9 @@ clean-all: ## Complete cleanup including images
 		echo "$(YELLOW)Cleanup cancelled$(NC)"; \
 	fi
 
-rebuild: ## Rebuild custom images (Data Generator)
+rebuild: ## Rebuild custom images (Hive Metastore, Superset, Data Generator)
 	@echo "$(YELLOW)Rebuilding custom images...$(NC)"
-	@docker compose build --no-cache data-generator
+	@docker compose build --no-cache hive-metastore superset data-generator
 	@echo "$(GREEN)✓ Rebuild complete$(NC)"
 
 update: ## Pull latest images
@@ -228,17 +232,37 @@ volumes: ## List all volumes
 urls: ## Show all service URLs
 	@echo "$(GREEN)Service URLs:$(NC)"
 	@echo "  Kafka UI:          http://localhost:8080"
-	@echo "  Schema Registry:   http://localhost:8081"
-	@echo "  Trino:             http://localhost:8086"
-	@echo "  Spark Master:      http://localhost:8888"
-	@echo "  Spark Worker 1:    http://localhost:8091"
-	@echo "  Spark Worker 2:    http://localhost:8092"
-	@echo "  MinIO Console:     http://localhost:9001"
-	@echo "  Grafana:           http://localhost:3000"
+	@echo "  Trino Web UI:      http://localhost:8080"
+	@echo "  Spark Master UI:   http://localhost:8081"
+	@echo "  Spark Worker UI:   http://localhost:8082"
+	@echo "  Superset:          http://localhost:8088 (admin/admin)"
+	@echo "  MinIO Console:     http://localhost:9001 (minioadmin/minioadmin)"
+	@echo "  Grafana:           http://localhost:3000 (admin/admin)"
 	@echo "  Prometheus:        http://localhost:9090"
+	@echo "  Schema Registry:   http://localhost:8081"
 	@echo "  Hive Metastore:    thrift://localhost:9083"
-	@echo "  PostgreSQL:        localhost:5432"
+	@echo "  PostgreSQL:        localhost:5432 (hive/hive123)"
 
 version: ## Show versions of all components
 	@echo "$(YELLOW)Component Versions:$(NC)"
 	@grep "image:" docker-compose.yml | grep -v "#" | awk '{print $$2}'
+
+spark-submit-kafka: ## Submit Kafka to Iceberg streaming job
+	@echo "$(YELLOW)Submitting Kafka to Iceberg streaming job...$(NC)"
+	@docker exec -d spark-master /opt/spark/bin/spark-submit \
+		--master spark://spark-master:7077 \
+		--deploy-mode client \
+		--conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
+		--conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+		--conf spark.sql.catalog.iceberg.type=hive \
+		--conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
+		--conf spark.sql.catalog.iceberg=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.hadoop.fs.s3a.secret.key=minioadmin \
+		--conf spark.sql.catalog.iceberg.warehouse=s3a://lakehouse/ \
+		--conf spark.hadoop.fs.s3a.access.key=minioadmin \
+		--conf spark.hadoop.fs.s3a.path.style.access=true \
+		--conf spark.sql.catalog.iceberg.uri=thrift://hive-metastore:9083 \
+		--conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
+		--packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262 \
+		/opt/spark/jobs/kafka_to_iceberg_streaming.py
+	@echo "$(GREEN)✓ Job submitted$(NC)"

@@ -19,9 +19,11 @@ def create_spark_session():
     return SparkSession.builder \
         .appName("BatchAggregations") \
         .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions") \
-        .config("spark.sql.catalog.local", "org.apache.iceberg.spark.SparkCatalog") \
-        .config("spark.sql.catalog.local.type", "hadoop") \
-        .config("spark.sql.catalog.local.warehouse", "s3a://lakehouse/") \
+        .config("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkSessionCatalog") \
+        .config("spark.sql.catalog.iceberg", "org.apache.iceberg.spark.SparkCatalog") \
+        .config("spark.sql.catalog.iceberg.type", "hive") \
+        .config("spark.sql.catalog.iceberg.uri", "thrift://hive-metastore:9083") \
+        .config("spark.sql.catalog.iceberg.warehouse", "s3a://lakehouse/") \
         .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000") \
         .config("spark.hadoop.fs.s3a.access.key", "minioadmin") \
         .config("spark.hadoop.fs.s3a.secret.key", "minioadmin") \
@@ -36,14 +38,13 @@ def create_silver_table(spark):
     logger.info("Creating Silver layer table")
 
     spark.sql("""
-        CREATE TABLE IF NOT EXISTS local.silver.transactions (
+        CREATE TABLE IF NOT EXISTS iceberg.silver.transactions (
             transaction_id STRING,
             account_id STRING,
             transaction_type STRING,
             amount DECIMAL(18,2),
             currency STRING,
             merchant STRING,
-            merchant_category STRING,
             transaction_timestamp TIMESTAMP,
             status STRING,
             is_flagged BOOLEAN,
@@ -65,7 +66,7 @@ def create_gold_table(spark):
     logger.info("Creating Gold layer table")
 
     spark.sql("""
-        CREATE TABLE IF NOT EXISTS local.gold.daily_account_summary (
+        CREATE TABLE IF NOT EXISTS iceberg.gold.daily_account_summary (
             account_id STRING,
             transaction_date DATE,
             total_transactions BIGINT,
@@ -95,8 +96,8 @@ def bronze_to_silver(spark, processing_date=None):
     """
     logger.info("Processing Bronze to Silver transformation")
 
-    # Read from Bronze layer
-    bronze_df = spark.table("local.bronze.transactions")
+    # Read from Bronze layer (using iceberg catalog, not local)
+    bronze_df = spark.table("iceberg.bronze.transactions")
 
     # Filter for specific date if provided, else process yesterday
     if processing_date:
@@ -107,6 +108,8 @@ def bronze_to_silver(spark, processing_date=None):
         )
 
     # Data Quality Checks and Transformations
+    # Note: Bronze table has 'timestamp' field, not 'transaction_timestamp'
+    # Note: Bronze table doesn't have 'merchant_category' - derive it or set to NULL
     silver_df = bronze_df \
         .dropDuplicates(["transaction_id"]) \
         .filter(col("amount") > 0) \
@@ -120,26 +123,26 @@ def bronze_to_silver(spark, processing_date=None):
             when(col("amount") > 0, "VALID").otherwise("INVALID")
         ) \
         .withColumn("processing_timestamp", current_timestamp()) \
+        .withColumn("transaction_timestamp", to_timestamp(col("timestamp"))) \
         .select(
             "transaction_id",
             "account_id",
             "transaction_type",
-            "amount",
+            col("amount").cast("decimal(18,2)").alias("amount"),
             "currency",
             "merchant",
-            "merchant_category",
             "transaction_timestamp",
             "status",
             "is_flagged",
             "validation_status",
             "processing_timestamp",
-            "date_partition"
+            col("date_partition").cast("date").alias("date_partition")
         )
 
     # Write to Silver layer
     logger.info(f"Writing {silver_df.count()} records to Silver layer")
 
-    silver_df.writeTo("local.silver.transactions") \
+    silver_df.writeTo("iceberg.silver.transactions") \
         .using("iceberg") \
         .tableProperty("write.format.default", "parquet") \
         .append()
@@ -154,8 +157,8 @@ def silver_to_gold(spark, processing_date=None):
     """
     logger.info("Processing Silver to Gold transformation")
 
-    # Read from Silver layer
-    silver_df = spark.table("local.silver.transactions")
+    # Read from Silver layer (using iceberg catalog)
+    silver_df = spark.table("iceberg.silver.transactions")
 
     # Filter for specific date
     if processing_date:
@@ -166,18 +169,20 @@ def silver_to_gold(spark, processing_date=None):
         )
 
     # Create aggregations
+    # Note: Transaction types in bronze are: PURCHASE, WITHDRAWAL, DEPOSIT, TRANSFER, PAYMENT
+    # Map to DEBIT/CREDIT logic: WITHDRAWAL/PAYMENT = DEBIT, DEPOSIT = CREDIT
     gold_df = silver_df \
         .groupBy("account_id", "date_partition") \
         .agg(
             count("*").alias("total_transactions"),
             sum(
-                when(col("transaction_type") == "DEBIT", col("amount")).otherwise(0)
+                when(col("transaction_type").isin(["WITHDRAWAL", "PAYMENT", "PURCHASE"]), col("amount")).otherwise(0)
             ).alias("total_debits"),
             sum(
-                when(col("transaction_type") == "CREDIT", col("amount")).otherwise(0)
+                when(col("transaction_type").isin(["DEPOSIT", "TRANSFER"]), col("amount")).otherwise(0)
             ).alias("total_credits"),
             sum(
-                when(col("transaction_type") == "CREDIT", col("amount"))
+                when(col("transaction_type").isin(["DEPOSIT", "TRANSFER"]), col("amount"))
                 .otherwise(-col("amount"))
             ).alias("net_amount"),
             avg("amount").alias("avg_transaction_amount"),
@@ -192,7 +197,7 @@ def silver_to_gold(spark, processing_date=None):
     # Write to Gold layer
     logger.info(f"Writing {gold_df.count()} records to Gold layer")
 
-    gold_df.writeTo("local.gold.daily_account_summary") \
+    gold_df.writeTo("iceberg.gold.daily_account_summary") \
         .using("iceberg") \
         .tableProperty("write.format.default", "parquet") \
         .append()
@@ -205,9 +210,8 @@ def generate_merchant_analytics(spark):
     logger.info("Generating merchant analytics")
 
     spark.sql("""
-        CREATE TABLE IF NOT EXISTS local.gold.merchant_summary (
+        CREATE TABLE IF NOT EXISTS iceberg.gold.merchant_summary (
             merchant STRING,
-            merchant_category STRING,
             transaction_date DATE,
             total_transactions BIGINT,
             total_amount DECIMAL(18,2),
@@ -222,20 +226,19 @@ def generate_merchant_analytics(spark):
     merchant_df = spark.sql("""
         SELECT
             merchant,
-            merchant_category,
             date_partition as transaction_date,
             COUNT(*) as total_transactions,
             SUM(amount) as total_amount,
             AVG(amount) as avg_amount,
             COUNT(DISTINCT account_id) as unique_accounts,
             CURRENT_TIMESTAMP() as processing_timestamp
-        FROM local.silver.transactions
+        FROM iceberg.silver.transactions
         WHERE date_partition = DATE_SUB(CURRENT_DATE(), 1)
             AND merchant IS NOT NULL
-        GROUP BY merchant, merchant_category, date_partition
+        GROUP BY merchant, date_partition
     """)
 
-    merchant_df.writeTo("local.gold.merchant_summary") \
+    merchant_df.writeTo("iceberg.gold.merchant_summary") \
         .using("iceberg") \
         .append()
 

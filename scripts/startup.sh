@@ -80,10 +80,11 @@ echo -e "\n${GREEN}Step 6: Starting Spark cluster...${NC}"
 docker compose up -d spark-master spark-worker-1 spark-worker-2
 
 # Start analytics
-echo -e "\n${GREEN}Step 7: Starting Trino...${NC}"
-docker compose up -d trino
+echo -e "\n${GREEN}Step 7: Starting Trino and Superset...${NC}"
+docker compose up -d trino superset
 
 check_service "trino"
+check_service "superset"
 
 # Start monitoring
 echo -e "\n${GREEN}Step 8: Starting monitoring stack...${NC}"
@@ -107,14 +108,14 @@ echo -e "${GREEN}Data Lakehouse Platform Started!${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo -e "\n${YELLOW}Service URLs:${NC}"
 echo -e "  Kafka UI:         http://localhost:8080"
-echo -e "  Schema Registry:  http://localhost:8081"
-echo -e "  Trino:            http://localhost:8086"
-echo -e "  Spark Master UI:  http://localhost:8888"
-echo -e "  Spark Worker 1:   http://localhost:8081"
-echo -e "  Spark Worker 2:   http://localhost:8082"
+echo -e "  Trino Web UI:     http://localhost:8080"
+echo -e "  Spark Master UI:  http://localhost:8081"
+echo -e "  Spark Worker UI:  http://localhost:8082"
+echo -e "  Superset:         http://localhost:8088 (admin/admin)"
 echo -e "  MinIO Console:    http://localhost:9001 (minioadmin/minioadmin)"
 echo -e "  Grafana:          http://localhost:3000 (admin/admin)"
 echo -e "  Prometheus:       http://localhost:9090"
+echo -e "  Schema Registry:  http://localhost:8081"
 echo -e "  PostgreSQL:       localhost:5432 (hive/hive123)"
 echo -e "  Hive Metastore:   thrift://localhost:9083"
 
@@ -123,11 +124,12 @@ if docker compose ps | grep -q datahub; then
 fi
 
 echo -e "\n${YELLOW}Next Steps:${NC}"
-echo -e "1. Check Kafka UI to verify streaming data from generator"
-echo -e "2. Query data lakehouse using Trino SQL interface"
-echo -e "3. View Spark UI to monitor streaming job execution"
-echo -e "4. Monitor system health in Grafana dashboards"
-echo -e "5. Explore Iceberg tables in MinIO via Trino"
+echo -e "1. Generate sample data: docker exec kafka-broker-1 python /scripts/data_generator.py --num-records 10000 --topic banking.transactions.raw"
+echo -e "2. Start streaming pipeline: ./submit-streaming-job.sh"
+echo -e "3. Verify data in bronze layer: docker exec trino trino --execute \"SELECT COUNT(*) FROM iceberg.bronze.transactions;\""
+echo -e "4. Run batch aggregations: ./submit-batch-job.sh"
+echo -e "5. Create Superset dashboards: http://localhost:8088 (connect to trino://trino@trino:8080/iceberg)"
+echo -e "6. Monitor with Grafana: http://localhost:3000"
 
 echo -e "\n${GREEN}For logs, use: docker compose logs -f [service-name]${NC}"
 echo -e "${GREEN}To stop all services: docker compose down${NC}"

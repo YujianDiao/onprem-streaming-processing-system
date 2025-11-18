@@ -188,8 +188,8 @@ services:
     environment:
       KAFKA_BOOTSTRAP_SERVERS: 'kafka-1:29092,kafka-2:29092,kafka-3:29092'
       SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
-      KAFKA_TOPIC: 'banking-transactions'
-      GENERATION_INTERVAL_MS: 1000
+      KAFKA_TOPIC: 'banking.transactions.raw'
+      GENERATION_INTERVAL_MS: 2000
     networks:
       - data-platform
     restart: unless-stopped
@@ -442,6 +442,153 @@ services:
     restart: unless-stopped
 
   # ==========================================
+  # APACHE SUPERSET - Data Visualization & BI
+  # ==========================================
+  superset:
+    build:
+      context: ./superset
+      dockerfile: Dockerfile
+    image: custom-superset:latest
+    hostname: superset
+    container_name: superset
+    depends_on:
+      - trino
+      - postgres
+    ports:
+      - "8088:8088"
+    environment:
+      - SUPERSET_SECRET_KEY=thisISaSECRET_1234
+      - TALISMAN_ENABLED=False
+    volumes:
+      - superset-data:/app/superset_home
+    networks:
+      - data-platform
+    restart: unless-stopped
+    command: >
+      sh -c "superset db upgrade &&
+             superset fab create-admin --username admin --firstname Admin --lastname User --email admin@superset.com --password admin &&
+             superset init &&
+             superset run -h 0.0.0.0 -p 8088 --with-threads --reload"
+
+  # ==========================================
+  # CADVISOR - Container Metrics
+  # ==========================================
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    hostname: cadvisor
+    container_name: cadvisor
+    ports:
+      - "8085:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - data-platform
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg
+
+  # ==========================================
+  # NODE EXPORTER - Host System Metrics
+  # ==========================================
+  node-exporter:
+    image: prom/node-exporter:latest
+    hostname: node-exporter
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+    command:
+      - '--path.rootfs=/host'
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - '/:/host:ro,rslave'
+    networks:
+      - data-platform
+    restart: unless-stopped
+
+  # ==========================================
+  # POSTGRES EXPORTER - PostgreSQL Metrics
+  # ==========================================
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    hostname: postgres-exporter
+    container_name: postgres-exporter
+    environment:
+      - DATA_SOURCE_NAME=postgresql://hive:hive123@postgres:5432/metastore?sslmode=disable
+    ports:
+      - "9187:9187"
+    networks:
+      - data-platform
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  # ==========================================
+  # KAFKA JMX EXPORTERS - Kafka Metrics
+  # ==========================================
+  kafka-jmx-exporter-1:
+    image: bitnami/jmx-exporter:latest
+    hostname: kafka-jmx-exporter-1
+    container_name: kafka-jmx-exporter-1
+    ports:
+      - "10001:5556"
+    environment:
+      - SERVICE_PORT=5556
+    volumes:
+      - ./monitoring/jmx-exporter/kafka-1-config.yml:/etc/jmx-exporter/config.yml
+    command:
+      - "5556"
+      - "/etc/jmx-exporter/config.yml"
+    networks:
+      - data-platform
+    depends_on:
+      - kafka-1
+    restart: unless-stopped
+
+  kafka-jmx-exporter-2:
+    image: bitnami/jmx-exporter:latest
+    hostname: kafka-jmx-exporter-2
+    container_name: kafka-jmx-exporter-2
+    ports:
+      - "10002:5556"
+    environment:
+      - SERVICE_PORT=5556
+    volumes:
+      - ./monitoring/jmx-exporter/kafka-2-config.yml:/etc/jmx-exporter/config.yml
+    command:
+      - "5556"
+      - "/etc/jmx-exporter/config.yml"
+    networks:
+      - data-platform
+    depends_on:
+      - kafka-2
+    restart: unless-stopped
+
+  kafka-jmx-exporter-3:
+    image: bitnami/jmx-exporter:latest
+    hostname: kafka-jmx-exporter-3
+    container_name: kafka-jmx-exporter-3
+    ports:
+      - "10003:5556"
+    environment:
+      - SERVICE_PORT=5556
+    volumes:
+      - ./monitoring/jmx-exporter/kafka-3-config.yml:/etc/jmx-exporter/config.yml
+    command:
+      - "5556"
+      - "/etc/jmx-exporter/config.yml"
+    networks:
+      - data-platform
+    depends_on:
+      - kafka-3
+    restart: unless-stopped
+
+  # ==========================================
   # DATAHUB - Data Catalog & Governance
   # (Optional - Resource Intensive)
   # ==========================================
@@ -559,5 +706,6 @@ volumes:
   minio-data:
   prometheus-data:
   grafana-data:
+  superset-data:
   datahub-mysql-data:
   datahub-elasticsearch-data:
