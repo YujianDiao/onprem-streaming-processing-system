@@ -442,6 +442,102 @@ services:
     restart: unless-stopped
 
   # ==========================================
+  # FLINK JOBMANAGER - Flink Cluster Master
+  # ==========================================
+  flink-jobmanager:
+    build:
+      context: ./flink
+      dockerfile: Dockerfile
+    image: custom-flink:1.18.0
+    hostname: flink-jobmanager
+    container_name: flink-jobmanager
+    ports:
+      - "8081:8081"  # Flink Web UI
+      - "6123:6123"  # Flink RPC
+      - "9249:9249"  # Prometheus metrics
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        parallelism.default: 2
+    command: jobmanager
+    volumes:
+      - ./flink/conf:/opt/flink/conf
+      - ./flink/jobs:/opt/flink-jobs
+      - flink-checkpoints:/tmp/flink-checkpoints
+      - flink-savepoints:/tmp/flink-savepoints
+    networks:
+      - data-platform
+    depends_on:
+      - kafka-1
+      - minio
+      - hive-metastore
+    restart: unless-stopped
+
+  # ==========================================
+  # FLINK TASKMANAGER 1 - Flink Worker Node
+  # ==========================================
+  flink-taskmanager-1:
+    build:
+      context: ./flink
+      dockerfile: Dockerfile
+    image: custom-flink:1.18.0
+    hostname: flink-taskmanager-1
+    container_name: flink-taskmanager-1
+    ports:
+      - "6121:6121"  # RPC port
+      - "6122:6122"  # Data port
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        parallelism.default: 2
+    command: taskmanager
+    volumes:
+      - ./flink/conf:/opt/flink/conf
+      - ./flink/jobs:/opt/flink-jobs
+      - flink-checkpoints:/tmp/flink-checkpoints
+      - flink-savepoints:/tmp/flink-savepoints
+    networks:
+      - data-platform
+    depends_on:
+      - flink-jobmanager
+    restart: unless-stopped
+
+  # ==========================================
+  # FLINK TASKMANAGER 2 - Flink Worker Node
+  # ==========================================
+  flink-taskmanager-2:
+    build:
+      context: ./flink
+      dockerfile: Dockerfile
+    image: custom-flink:1.18.0
+    hostname: flink-taskmanager-2
+    container_name: flink-taskmanager-2
+    ports:
+      - "6131:6121"  # RPC port
+      - "6132:6122"  # Data port
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        parallelism.default: 2
+    command: taskmanager
+    volumes:
+      - ./flink/conf:/opt/flink/conf
+      - ./flink/jobs:/opt/flink-jobs
+      - flink-checkpoints:/tmp/flink-checkpoints
+      - flink-savepoints:/tmp/flink-savepoints
+    networks:
+      - data-platform
+    depends_on:
+      - flink-jobmanager
+    restart: unless-stopped
+
+  # ==========================================
   # APACHE SUPERSET - Data Visualization & BI
   # ==========================================
   superset:
@@ -709,3 +805,5 @@ volumes:
   superset-data:
   datahub-mysql-data:
   datahub-elasticsearch-data:
+  flink-checkpoints:
+  flink-savepoints:

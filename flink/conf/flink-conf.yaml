@@ -1,0 +1,111 @@
+# Flink Configuration for Banking Data Processing Platform
+
+# ==============================================================================
+# Common Configuration
+# ==============================================================================
+
+# JobManager configuration
+jobmanager.rpc.address: flink-jobmanager
+jobmanager.rpc.port: 6123
+jobmanager.memory.process.size: 2048m
+
+# TaskManager configuration
+taskmanager.memory.process.size: 4096m
+taskmanager.numberOfTaskSlots: 4
+parallelism.default: 2
+
+# High Availability (disabled for single-node setup)
+high-availability: NONE
+
+# ==============================================================================
+# Checkpoint and State Backend Configuration
+# ==============================================================================
+
+# State backend - use RocksDB for large state
+state.backend: rocksdb
+
+# Checkpoint storage - use MinIO (S3-compatible)
+state.checkpoints.dir: s3://lakehouse/flink-checkpoints
+state.savepoints.dir: s3://lakehouse/flink-savepoints
+
+# Checkpoint configuration
+execution.checkpointing.interval: 30000
+execution.checkpointing.mode: EXACTLY_ONCE
+execution.checkpointing.timeout: 600000
+execution.checkpointing.max-concurrent-checkpoints: 1
+execution.checkpointing.min-pause: 10000
+
+# Incremental checkpoints for RocksDB
+state.backend.incremental: true
+
+# ==============================================================================
+# S3/MinIO Configuration
+# ==============================================================================
+
+# S3 endpoint (MinIO)
+s3.endpoint: http://minio:9000
+s3.path.style.access: true
+s3.access-key: minioadmin
+s3.secret-key: minioadmin
+
+# Hadoop S3A configuration
+fs.s3a.endpoint: http://minio:9000
+fs.s3a.access.key: minioadmin
+fs.s3a.secret.key: minioadmin
+fs.s3a.path.style.access: true
+fs.s3a.connection.ssl.enabled: false
+fs.s3a.impl: org.apache.hadoop.fs.s3a.S3AFileSystem
+
+# ==============================================================================
+# Hive Metastore Configuration (for Iceberg)
+# ==============================================================================
+
+table.catalog-store.kind: hive
+table.catalog-store.hive.hive-conf-dir: /opt/flink/conf
+
+# ==============================================================================
+# Metrics and Monitoring
+# ==============================================================================
+
+# Metrics reporters
+metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+metrics.reporter.prom.port: 9249
+
+# ==============================================================================
+# Web UI Configuration
+# ==============================================================================
+
+web.port: 8081
+web.submit.enable: true
+web.upload.dir: /opt/flink/uploads
+
+# ==============================================================================
+# Restart Strategy Configuration
+# ==============================================================================
+
+# Fixed delay restart strategy
+restart-strategy: fixed-delay
+restart-strategy.fixed-delay.attempts: 3
+restart-strategy.fixed-delay.delay: 10s
+
+# ==============================================================================
+# Advanced Configuration
+# ==============================================================================
+
+# Network buffer configuration
+taskmanager.network.memory.fraction: 0.1
+taskmanager.network.memory.min: 64mb
+taskmanager.network.memory.max: 1gb
+
+# Managed memory
+taskmanager.memory.managed.fraction: 0.4
+
+# JVM Options
+env.java.opts.jobmanager: -Dlog4j.configurationFile=file:///opt/flink/conf/log4j.properties
+env.java.opts.taskmanager: -Dlog4j.configurationFile=file:///opt/flink/conf/log4j.properties
+
+# Classloader resolution order
+classloader.resolve-order: parent-first
+
+# Enable web submission
+web.submit.enable: true

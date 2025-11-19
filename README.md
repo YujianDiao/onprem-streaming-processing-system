@@ -21,11 +21,12 @@ A modern, containerized data lakehouse platform designed for proof-of-concept de
 This platform provides a complete data lakehouse solution including:
 
 - **Real-time Event Streaming**: Apache Kafka in KRaft mode (no Zookeeper)
-- **Stream Processing**: Apache Spark with Iceberg integration
+- **Stream Processing**: Apache Spark (near real-time) + Apache Flink (true real-time)
 - **Data Lake Storage**: MinIO (S3-compatible) with Apache Iceberg
 - **SQL Analytics**: Trino for distributed queries on the lakehouse
 - **Metadata Management**: Hive Metastore for Iceberg catalog
 - **Streaming Data Generator**: Python-based fake data generation
+- **Banking Pipelines**: Fraud detection, transaction monitoring, balance aggregation
 - **Data Catalog**: DataHub (optional)
 - **Monitoring**: Prometheus & Grafana
 - **Management UI**: Kafka UI for cluster monitoring
@@ -34,11 +35,16 @@ This platform provides a complete data lakehouse solution including:
 
 ✅ Fully containerized with Docker Compose
 ✅ Modern data lakehouse architecture
+✅ **Hybrid streaming: Spark (near real-time) + Flink (true real-time)**
 ✅ Kafka in KRaft mode (no Zookeeper dependency)
 ✅ ACID transactions and time travel with Iceberg
 ✅ Distributed SQL queries with Trino
 ✅ Schema evolution and validation
 ✅ Real-time streaming data generation
+✅ **Production-ready banking pipelines:**
+  - Fraud detection with Complex Event Processing (CEP)
+  - Real-time transaction monitoring and alerting
+  - Live balance aggregation and overdraft detection
 ✅ Comprehensive monitoring and alerting
 ✅ Sample banking data pipeline included
 
@@ -47,21 +53,56 @@ This platform provides a complete data lakehouse solution including:
 The platform implements a modern data lakehouse architecture optimized for analytics:
 
 ```
-Data Generator → Kafka → Spark Streaming → Iceberg (MinIO) ← Trino (SQL Analytics)
-                  ↓                             ↑
-            Schema Registry              Hive Metastore
-                                              ↓
-                                    Prometheus/Grafana (Monitoring)
+                           ┌─────────────────────────┐
+                           │    Data Generator       │
+                           │  (Banking Transactions) │
+                           └───────────┬─────────────┘
+                                       ▼
+                           ┌─────────────────────────┐
+                           │    Kafka Cluster        │
+                           │  (3 brokers, KRaft)     │
+                           └──────┬──────────────────┘
+                                  │
+                ┌─────────────────┴─────────────────┐
+                ▼                                   ▼
+    ┌─────────────────────┐           ┌─────────────────────┐
+    │  Spark Streaming    │           │  Flink Streaming    │
+    │  (30s micro-batch)  │           │  (sub-second)       │
+    │                     │           │  • Fraud Detection  │
+    │  • Iceberg Ingest   │           │  • TX Monitoring    │
+    │  • ETL Pipelines    │           │  • Balance Agg      │
+    └──────────┬──────────┘           └──────────┬──────────┘
+               │                                  │
+               ▼                                  ▼
+    ┌─────────────────────┐           ┌─────────────────────┐
+    │  Iceberg Tables     │◄──────────┤  Kafka Topics +     │
+    │  (MinIO S3)         │           │  Iceberg            │
+    └──────────┬──────────┘           └─────────────────────┘
+               │
+               ▼
+    ┌─────────────────────┐
+    │  Trino (SQL)        │
+    │  Hive Metastore     │
+    └─────────────────────┘
+               │
+               ▼
+    ┌─────────────────────┐
+    │  Prometheus/Grafana │
+    │  (Monitoring)       │
+    └─────────────────────┘
 ```
 
 **Key Architectural Decisions:**
 
-- **No Orchestration Layer**: Spark jobs run continuously for streaming, no Airflow needed
+- **Hybrid Streaming**: Spark for ETL/batch, Flink for real-time alerting and CEP
+- **No Orchestration Layer**: Jobs run continuously for streaming, no Airflow needed
 - **No Serving Layer**: Trino queries Iceberg tables directly, no PostgreSQL copy
-- **Simplified Stack**: Removed Zookeeper, Kafka Connect, Superset for reduced complexity
+- **Simplified Stack**: No Zookeeper (KRaft mode), no Kafka Connect
 - **Lakehouse-First**: All data stored in open format (Iceberg/Parquet) on object storage
 
-For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
+**Documentation:**
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
+- [FLINK_INTEGRATION.md](docs/FLINK_INTEGRATION.md) - Flink banking pipelines guide
 
 ## Technology Stack
 
@@ -69,7 +110,8 @@ For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
 |-----------|-----------|---------|---------|
 | Event Streaming | Apache Kafka (KRaft) | 7.5.0 | Message broker in consensus mode |
 | Schema Management | Confluent Schema Registry | 7.5.0 | Avro/JSON schema validation |
-| Stream Processing | Apache Spark | 3.5.0 | Real-time data processing (apache/spark) |
+| Near Real-time Processing | Apache Spark | 3.5.0 | Micro-batch streaming, ETL |
+| **Real-time Processing** | **Apache Flink** | **1.18.0** | **Sub-second streaming, CEP, stateful processing** |
 | SQL Analytics | Trino | Latest | Distributed SQL query engine |
 | Object Storage | MinIO | Latest | S3-compatible data lake |
 | Table Format | Apache Iceberg | 1.4.2 | ACID transactions, time travel |
@@ -137,7 +179,7 @@ The startup script will:
 
 **Access the platform:**
 - Kafka UI: http://localhost:8080
-- Schema Registry: http://localhost:8081
+- **Flink Dashboard: http://localhost:8081** ⭐ NEW
 - Trino: http://localhost:8086
 - Spark Master: http://localhost:8888
 - Spark Worker 1: http://localhost:8091
@@ -145,6 +187,7 @@ The startup script will:
 - Grafana: http://localhost:3000 (admin/admin)
 - MinIO Console: http://localhost:9001 (minioadmin/minioadmin)
 - Prometheus: http://localhost:9090
+- Schema Registry: http://localhost:8081 (Note: conflicts with Flink, use docker port mapping)
 
 ## Detailed Setup
 
@@ -711,6 +754,7 @@ make clean-all         # Complete cleanup
 | Service | URL | Default Credentials |
 |---------|-----|-------------------|
 | Kafka UI | http://localhost:8080 | - |
+| **Flink Dashboard** | **http://localhost:8081** | **-** |
 | Schema Registry | http://localhost:8081 | - |
 | Trino | http://localhost:8086 | - |
 | Spark Master | http://localhost:8888 | - |
@@ -722,6 +766,8 @@ make clean-all         # Complete cleanup
 | PostgreSQL | localhost:5432 | hive/hive123 |
 | Hive Metastore | thrift://localhost:9083 | - |
 | DataHub (optional) | http://localhost:9002 | - |
+
+**Note:** Schema Registry and Flink both use port 8081. Access Schema Registry via the Kafka UI or use docker port mapping.
 
 ## Cleanup
 
