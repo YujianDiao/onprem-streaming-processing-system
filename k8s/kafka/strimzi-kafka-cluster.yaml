@@ -1,0 +1,161 @@
+---
+# Kafka Cluster using Strimzi Operator with KRaft mode
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: lakehouse-cluster
+  namespace: kafka
+spec:
+  kafka:
+    version: 3.6.0
+    replicas: 3
+    # KRaft mode configuration (no Zookeeper)
+    metadataVersion: 3.6-IV2
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+      - name: external
+        port: 9094
+        type: loadbalancer
+        tls: false
+    config:
+      offsets.topic.replication.factor: 2
+      transaction.state.log.replication.factor: 2
+      transaction.state.log.min.isr: 2
+      default.replication.factor: 2
+      min.insync.replicas: 2
+      auto.create.topics.enable: true
+      log.retention.hours: 168  # 7 days
+      log.segment.bytes: 1073741824  # 1GB
+      compression.type: producer
+    resources:
+      requests:
+        memory: 2Gi
+        cpu: 1000m
+      limits:
+        memory: 3Gi
+        cpu: 2000m
+    jvmOptions:
+      -Xms: 1024m
+      -Xmx: 1024m
+    storage:
+      type: jbod
+      volumes:
+      - id: 0
+        type: persistent-claim
+        size: 50Gi
+        deleteClaim: false
+        class: fast-ssd
+    metricsConfig:
+      type: jmxPrometheusExporter
+      valueFrom:
+        configMapKeyRef:
+          name: kafka-metrics
+          key: kafka-metrics-config.yml
+    # Pod anti-affinity to spread brokers across nodes
+    template:
+      pod:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchExpressions:
+                    - key: strimzi.io/name
+                      operator: In
+                      values:
+                        - lakehouse-cluster-kafka
+                topologyKey: "kubernetes.io/hostname"
+        tolerations:
+          - key: "workload-type"
+            operator: "Equal"
+            value: "kafka"
+            effect: "NoSchedule"
+  # Entity Operator for topic and user management
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}
+---
+# Kafka Topics
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: banking.transactions.raw
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: lakehouse-cluster
+spec:
+  partitions: 3
+  replicas: 2
+  config:
+    retention.ms: 604800000  # 7 days
+    segment.bytes: 1073741824
+    compression.type: producer
+    min.insync.replicas: 2
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: banking.accounts.cdc
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: lakehouse-cluster
+spec:
+  partitions: 3
+  replicas: 2
+  config:
+    retention.ms: 604800000
+    min.insync.replicas: 2
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: banking.customers.enriched
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: lakehouse-cluster
+spec:
+  partitions: 3
+  replicas: 2
+  config:
+    retention.ms: 604800000
+    min.insync.replicas: 2
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: banking.transactions.dlq
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: lakehouse-cluster
+spec:
+  partitions: 1
+  replicas: 2
+  config:
+    retention.ms: 2592000000  # 30 days
+    min.insync.replicas: 1
+---
+# Kafka Metrics ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-metrics
+  namespace: kafka
+data:
+  kafka-metrics-config.yml: |
+    lowercaseOutputName: true
+    rules:
+    - pattern: kafka.server<type=(.+), name=(.+), clientId=(.+), topic=(.+), partition=(.*)><>Value
+      name: kafka_server_$1_$2
+      type: GAUGE
+      labels:
+       clientId: "$3"
+       topic: "$4"
+       partition: "$5"
+    - pattern: kafka.server<type=(.+), name=(.+), clientId=(.+), brokerHost=(.+), brokerPort=(.+)><>Value
+      name: kafka_server_$1_$2
+      type: GAUGE
+      labels:
+       clientId: "$3"
+       broker: "$4:$5"

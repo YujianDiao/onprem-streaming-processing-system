@@ -1,0 +1,125 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trino-config
+  namespace: analytics
+data:
+  config.properties: |
+    coordinator=true
+    node-scheduler.include-coordinator=true
+    http-server.http.port=8080
+    discovery.uri=http://trino:8080
+    query.max-memory=3GB
+    query.max-memory-per-node=1GB
+    query.max-total-memory-per-node=1.5GB
+
+  node.properties: |
+    node.environment=production
+    node.data-dir=/data/trino
+
+  jvm.config: |
+    -server
+    -Xmx3G
+    -XX:+UseG1GC
+    -XX:G1HeapRegionSize=32M
+    -XX:+UseGCOverheadLimit
+    -XX:+ExplicitGCInvokesConcurrent
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:+ExitOnOutOfMemoryError
+    -Djdk.attach.allowAttachSelf=true
+    -Djdk.nio.maxCachedBufferSize=2000000
+
+  log.properties: |
+    io.trino=INFO
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trino-catalog
+  namespace: analytics
+data:
+  iceberg.properties: |
+    connector.name=iceberg
+    hive.metastore.uri=thrift://hive-metastore.storage.svc.cluster.local:9083
+    iceberg.catalog.type=hive_metastore
+    hive.s3.endpoint=http://minio.storage.svc.cluster.local:9000
+    hive.s3.aws-access-key=minioadmin
+    hive.s3.aws-secret-key=minioadmin
+    hive.s3.path-style-access=true
+    hive.s3.ssl.enabled=false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trino
+  namespace: analytics
+  labels:
+    app: trino
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app: trino
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trino
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trino
+  template:
+    metadata:
+      labels:
+        app: trino
+    spec:
+      nodeSelector:
+        workload-type: analytics
+      containers:
+      - name: trino
+        image: trinodb/trino:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        volumeMounts:
+        - name: trino-config
+          mountPath: /etc/trino
+        - name: trino-catalog
+          mountPath: /etc/trino/catalog
+        resources:
+          requests:
+            cpu: 1500m
+            memory: 3Gi
+          limits:
+            cpu: 2500m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /v1/info
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /v1/info
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 3
+      volumes:
+      - name: trino-config
+        configMap:
+          name: trino-config
+      - name: trino-catalog
+        configMap:
+          name: trino-catalog

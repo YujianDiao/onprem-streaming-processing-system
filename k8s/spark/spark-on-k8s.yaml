@@ -1,0 +1,126 @@
+---
+# Spark Service Account with RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: spark
+  namespace: spark
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: spark-role
+  namespace: spark
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: spark-role-binding
+  namespace: spark
+subjects:
+- kind: ServiceAccount
+  name: spark
+  namespace: spark
+roleRef:
+  kind: Role
+  name: spark-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# ConfigMap for Spark configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spark-config
+  namespace: spark
+data:
+  spark-defaults.conf: |
+    spark.master                     k8s://https://kubernetes.default.svc:443
+    spark.kubernetes.namespace       spark
+    spark.kubernetes.authenticate.driver.serviceAccountName spark
+    spark.kubernetes.container.image apache/spark:3.5.0
+    spark.executor.instances         2
+    spark.executor.cores             2
+    spark.executor.memory            3g
+    spark.driver.memory              2g
+    spark.sql.extensions             org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+    spark.sql.catalog.spark_catalog  org.apache.iceberg.spark.SparkSessionCatalog
+    spark.sql.catalog.iceberg        org.apache.iceberg.spark.SparkCatalog
+    spark.sql.catalog.iceberg.type   hive
+    spark.sql.catalog.iceberg.uri    thrift://hive-metastore.storage.svc.cluster.local:9083
+    spark.sql.catalog.iceberg.warehouse s3a://lakehouse/
+    spark.hadoop.fs.s3a.endpoint     http://minio.storage.svc.cluster.local:9000
+    spark.hadoop.fs.s3a.access.key   minioadmin
+    spark.hadoop.fs.s3a.secret.key   minioadmin
+    spark.hadoop.fs.s3a.path.style.access true
+    spark.hadoop.fs.s3a.impl         org.apache.hadoop.fs.s3a.S3AFileSystem
+---
+# Spark Streaming Job using SparkApplication CRD (requires Spark Operator)
+apiVersion: sparkoperator.k8s.io/v1beta2
+kind: SparkApplication
+metadata:
+  name: kafka-to-iceberg-streaming
+  namespace: spark
+spec:
+  type: Python
+  mode: cluster
+  image: apache/spark:3.5.0-python3
+  imagePullPolicy: Always
+  mainApplicationFile: s3a://lakehouse/jobs/kafka_to_iceberg_streaming.py
+  sparkVersion: 3.5.0
+  restartPolicy:
+    type: Always
+
+  driver:
+    cores: 1
+    coreLimit: "1200m"
+    memory: "2g"
+    serviceAccount: spark
+    labels:
+      app: spark-streaming-driver
+    nodeSelector:
+      workload-type: processing
+
+  executor:
+    cores: 2
+    instances: 2
+    memory: "3g"
+    serviceAccount: spark
+    labels:
+      app: spark-streaming-executor
+    nodeSelector:
+      workload-type: processing
+
+  sparkConf:
+    "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+    "spark.sql.catalog.iceberg": "org.apache.iceberg.spark.SparkCatalog"
+    "spark.sql.catalog.iceberg.type": "hive"
+    "spark.sql.catalog.iceberg.uri": "thrift://hive-metastore.storage.svc.cluster.local:9083"
+    "spark.sql.catalog.iceberg.warehouse": "s3a://lakehouse/"
+    "spark.hadoop.fs.s3a.endpoint": "http://minio.storage.svc.cluster.local:9000"
+    "spark.hadoop.fs.s3a.access.key": "minioadmin"
+    "spark.hadoop.fs.s3a.secret.key": "minioadmin"
+    "spark.hadoop.fs.s3a.path.style.access": "true"
+    "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem"
+    "spark.streaming.stopGracefullyOnShutdown": "true"
+
+  deps:
+    jars:
+      - s3a://lakehouse/jars/iceberg-spark-runtime-3.5_2.12-1.4.2.jar
+      - s3a://lakehouse/jars/kafka-clients-3.5.1.jar
+      - s3a://lakehouse/jars/spark-sql-kafka-0-10_2.12-3.5.0.jar
+      - s3a://lakehouse/jars/aws-java-sdk-bundle-1.12.262.jar
+      - s3a://lakehouse/jars/hadoop-aws-3.3.4.jar
+
+  monitoring:
+    exposeDriverMetrics: true
+    exposeExecutorMetrics: true
+    prometheus:
+      jmxExporterJar: "/prometheus/jmx_prometheus_javaagent-0.17.0.jar"
+      port: 8090
